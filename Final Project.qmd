@@ -1,0 +1,939 @@
+---
+title: "Final Project"
+format: docx
+editor: visual
+---
+
+## Loading packages
+
+```{r}
+library(tidyverse)  # For data manipulation and visualization.
+library(rpart)  # For building decision trees.
+library(rpart.plot)  # For enhanced tree visualization.
+library(patchwork)  # For combining multiple ggplot2 plots.
+library(corrplot)  # For visualizing correlations.
+library(randomForest)  # For ensemble decision tree models.
+library(dplyr)  # For data manipulation (part of tidyverse).
+library(caTools)  # For smart data splitting.
+library(ROCR)  # For ROC and AUC curve visualization.
+library(caret)  # For general machine learning tasks.
+library(ROSE) #For balance imbalanced datasets for better model performance.
+library(dendextend) # For enhanced dendrogram visualization and customization.
+library(circlize) #For creating circular visualizations
+library(ggplot2) #For creating visualizations
+```
+
+## Preparing Dataset
+
+```{r}
+data0 <- read.csv("diabetes_binary_health_indicators_BRFSS2015.csv")
+data1 <- data0
+summary(data1)
+```
+
+```{r}
+# List of binary categorical variables
+binary_vars <- c("Diabetes_binary", "HighBP", "HighChol", "CholCheck", 
+                 "Smoker", "Stroke", "HeartDiseaseorAttack", "PhysActivity", 
+                 "Fruits", "Veggies", "HvyAlcoholConsump", "AnyHealthcare", 
+                 "NoDocbcCost", "DiffWalk", "Sex")
+
+# Loop through variables and create bar plots
+for (var in binary_vars) {
+  p <- ggplot(data1, aes_string(x = var)) +
+    geom_bar(fill = "steelblue") +
+    labs(title = paste("Distribution of", var),
+         x = var, 
+         y = "Count") +
+    theme_minimal()
+  print(p)
+}
+```
+
+## **Data Description**
+
+**Diabetes_binary (Binary)\
+**0 = no diabetes 1 = prediabetes or diabetes\
+**HighBP (Binary)\
+**0 = no high BP 1 = high BP\
+**HighChol (Binary)\
+**0 = no high cholesterol 1 = high cholesterol\
+**CholCheck (Binary)\
+**0 = no cholesterol check in 5 years 1 = yes cholesterol check in 5 years\
+**BMI (Continuous)\
+**Body Mass Index\
+**Smoker (Binary)\
+**Have you smoked at least 100 cigarettes in your entire life?\
+\[Note: 5 packs = 100 cigarettes\]\
+0 = no 1 = yes\
+**Stroke (Binary)\
+**(Ever told) you had a stroke.\
+0 = no 1 = yes\
+**HeartDiseaseorAttack (Binary)\
+**coronary heart disease (CHD) or myocardial infarction (MI)\
+0 = no 1 = yes\
+**PhysActivity (Binary)\
+**physical activity in past 30 days - not including job\
+0 = no 1 = yes\
+**Fruits (Binary)\
+**Consume Fruit 1 or more times per day\
+0 = no 1 = yes\
+**Veggies (Binary)\
+**Consume Vegetables 1 or more times per day\
+0 = no 1 = yes\
+**HvyAlcoholConsump (Binary)\
+**Heavy drinkers (adult men having more than 14 drinks per week and adult women having more than 7 drinks per week)\
+0 = no 1 = yes\
+**AnyHealthcare(Binary)\
+**Have any kind of health care coverage, including health insurance, prepaid plans such as HMO, etc.\
+0 = no 1 = yes\
+**NoDocbcCost (Binary)\
+**Was there a time in the past 12 months when you needed to see a doctor but could not because of cost?\
+0 = no 1 = yes\
+**GenHlth (Categorical)\
+**Would you say that in general your health is: scale 1-5\
+1 = excellent 2 = very good 3 = good 4 = fair 5 = poor\
+**MentHlth (Continuous)\
+**Now thinking about your mental health, which includes stress, depression, and problems with emotions, for how many days during the past 30 days was your mental health not good?\
+scale 1-30 days\
+**PhysHlth (Continuous)\
+**Now thinking about your physical health, which includes physical illness and injury, for how many days during the past 30 days was your physical health not good?\
+scale 1-30 days\
+**DiffWalk (Binary)\
+**Do you have serious difficulty walking or climbing stairs?\
+0 = no 1 = yes\
+**Sex (Binary)\
+**0 = female 1 = male\
+**Age (Categorical)\
+**13-level age category (\_AGEG5YR see codebook)\
+1 = 18-24 9 = 60-64 13 = 80 or older\
+**Education (Categorical)\
+**Education level (EDUCA see codebook) scale 1-6\
+1 = Never attended school or only kindergarten\
+2 = Grades 1 through 8 (Elementary)\
+3 = Grades 9 through 11 (Some high school)\
+4 = Grade 12 or GED (High school graduate)\
+5 = College 1 year to 3 years (Some college or technical school)\
+6 = College 4 years or more (College graduate)\
+Change to\
+0 = Below Grade 12 or GED (Below High school graduate)\
+1 = Grade 12 or GED (High school graduate)\
+2 = College 1 year to 3 years (Some college or technical school)\
+3 = College 4 years or more (College graduate)\
+**Income (Categorical)\
+**Income scale (INCOME2 see codebook)\
+scale 1-8 1 = less than \$10,000 5 = less than \$35,000 8 = \$75,000 or more
+
+## **Data Cleaning and Checking**
+
+```{r}
+# Check for missing values
+missing_values <- colSums(is.na(data1))
+print("Number of missing values in each column:")
+print(missing_values)
+```
+
+```{r}
+# Remove the columns GenHlth, Age and Income
+data1 <- data1[, !(names(data1) %in% c("GenHlth", "Age", "Income"))]
+# Age and Income descriptions are missing
+# And GenHlth always have problems in previous assignments
+summary(data1)
+```
+
+```{r}
+# Create a new column to store the recoded result
+data1$Education <- ifelse(data1$Education %in% c(1, 2, 3), 0, 
+                                 ifelse(data1$Education == 4, 1, 
+                                        ifelse(data1$Education == 5, 2, 
+                                               ifelse(data1$Education == 6, 3, data1$Education))))
+
+# Convert the recoded Education_recode column to integer type
+data1$Education <- as.integer(data1$Education)
+```
+
+```{r}
+# View the recoded result
+table(data0$Education)
+table(data1$Education)
+str(data1$Education)
+```
+
+```{r}
+#Check Education transform correctly
+str(data0$Diabetes_binary)
+str(data1$Diabetes_binary)
+str(data0$Education)
+str(data1$Education)
+```
+
+```{r}
+#Import data from cleaned and modifed data
+df0 <- data1
+
+# keep df0 as copy
+df1 <- df0
+
+# Convert the columns to a factor
+df1$Diabetes_binary <- as.factor(df1$Diabetes_binary)
+df1$HighBP <- as.factor(df1$HighBP)
+df1$HighChol <- as.factor(df1$HighChol)
+df1$CholCheck <- as.factor(df1$CholCheck)
+df1$Smoker <- as.factor(df1$Smoker)
+df1$Stroke <- as.factor(df1$Stroke)
+df1$HeartDiseaseorAttack <- as.factor(df1$HeartDiseaseorAttack)
+df1$PhysActivity <- as.factor(df1$PhysActivity)
+df1$Fruits <- as.factor(df1$Fruits)
+df1$Veggies <- as.factor(df1$Veggies)
+df1$HvyAlcoholConsump <- as.factor(df1$HvyAlcoholConsump)
+df1$AnyHealthcare <- as.factor(df1$AnyHealthcare)
+df1$NoDocbcCost <- as.factor(df1$NoDocbcCost)
+df1$DiffWalk <- as.factor(df1$DiffWalk)
+df1$Sex <- as.factor(df1$Sex)
+df1$Education <- as.factor(df1$Education)
+
+summary(df0)
+summary(df1)
+```
+
+```{r}
+#All variables
+# "Diabetes_binary" "HighBP" "HighChol" "CholCheck" "BMI" 
+# "Smoker" "Stroke" "HeartDiseaseorAttack" "PhysActivity" "Fruits" 
+# "Veggies" "HvyAlcoholConsump" "AnyHealthcare" "NoDocbcCost" 
+# "GenHlth" "MentHlth" "PhysHlth" "DiffWalk" "Sex" "Education"
+```
+
+## Preliminary Analysis
+
+```{r}
+cormat1 <- round(cor(df0),2)
+
+#corrplot(cormat)
+corrplot(cormat1, method="circle",type="upper" ,diag=FALSE, number.cex = 0.5, tl.cex=1.2,  cl.cex = 1)
+```
+
+## **Split The Dataset & Check That Both Train And Test Have A Similar Proportion**
+
+```{r}
+set.seed(123, sample.kind = "Rejection")
+
+#split the dataset leaving 80% of observations in the training dataset and 20% in the test dataset:
+spl = sample(nrow(df1),0.8*nrow(df1))
+head(spl)
+
+# Now lets split our dataset into train and test:
+
+train.df1 = df1[spl,]
+test.df1 = df1[-spl,]
+
+#  \n is a "new line" printing control
+cat("\n For the train dataset: ")      
+prop.table(table(train.df1$Diabetes_binary))
+cat("\n For the test dataset: ")
+prop.table(table(test.df1$Diabetes_binary))
+```
+
+## First Classification Trees (Pick up Useful Variables)
+
+```{r}
+#tree1<-rpart(Diabetes_binary ~ ., data=train.df1, method="class",minbucket=250, cp=0.001)
+#rpart.plot(tree1)
+
+#minbucket = 30 is fine
+tree1<-rpart(Diabetes_binary ~ ., data=train.df1, method="class",minbucket=30, cp=0.001)
+rpart.plot(tree1)
+```
+
+## Potential variables with good correlation
+
+```{r}
+#Temporary keep these factors
+# "HighBP" "BMI" "HighChol" "DiffWalk" "HeartDiseaseorAttack" "PhysHlth"
+```
+
+## Cross-Validation to get a good tree
+
+```{r}
+#tree_cv1 = rpart(Diabetes_binary ~ ., data=train.df1, method="class",minbucket=250 ,cp= 0.0001)
+#plotcp(tree_cv1)
+
+tree_cv1 = rpart(Diabetes_binary ~ ., data=train.df1, method="class",minbucket=30 ,cp= 0.001)
+plotcp(tree_cv1)
+```
+
+## Second Classification Trees Chose Best CP
+
+```{r}
+#Chose cp at 0.0022
+#tree_cv2 = rpart(Diabetes_binary ~  ., data=train.df1, method="class", minbucket=250 ,cp= 0.00069 )
+#rpart.plot(tree_cv2,digits=-2, cex = 0.8)
+
+tree_cv2 = rpart(Diabetes_binary ~ ., data=train.df1, method="class", minbucket=30  ,cp= 0.0022 )
+rpart.plot(tree_cv2,digits=-2)
+```
+
+## Random Forest
+
+For random Forest, the function we use is:
+
+\$ **randomForest** (formula, data, ntree, nodesize, mtry) \$
+
+Note:
+
+-   For regression models, the dependent variable should be type="num"
+
+-   For **classification models**, the dependent variable should be of type="factor"
+
+-   **ntree:** Usually, 100 is enough. Lets start with 100.
+
+-   **nodesize**: Lets start with 50.
+
+-   **mtry** = #ofvariables/3=4 for regression, sqrt(p) for classification.
+
+```{r}
+# sqrt(18) = 4
+set.seed(123, sample.kind = "Rejection")
+rf1= randomForest(Diabetes_binary~., 
+                  data=train.df1, ntree=50, nodesize=50, mtry = 4)
+plot(rf1)
+#ntree=20 is enough test from ntree = 50
+```
+
+## **Out-of-Bag Error**
+
+**tuneRF** (x, y, mtryStart = \[starting point for the value of mtry\]
+
+**stepFactor** = \[at each iteration, mtry is multiplied (or divided) by this number\]
+
+**ntreeTry** = \[number of trees used at the tuning step - select from above\],
+
+**nodesize** = \[same as before\]
+
+**improve** = \[(relative) improvement in OOB error must bem at least by this amount for the search to continue\])
+
+```{r}
+x = train.df1[,-1]   # -1 removes Diabetes_binary
+
+y = train.df1$Diabetes_binary  
+
+
+set.seed(123, sample.kind="Rejection")
+tuneRF (x, y, mtryStart = 3, stepFactor = 2, ntreeTry=20, nodesize=50, improve=0.01)
+```
+
+```{r}
+# Optimal m_try value is 3, not 4
+set.seed(123, sample.kind="Rejection")
+rf_final1 = randomForest(Diabetes_binary~., data=train.df1, ntree=20, nodesize=50, mtry= 3)
+varImpPlot(rf_final1)
+importance(rf_final1)
+```
+
+```{r}
+# "HighBP" "BMI" "HighChol" "DiffWalk"  "PhysHlth" "HeartDiseaseorAttack"
+```
+
+```{r}
+HighBP_proportion <- train.df1 %>%
+  group_by(HighBP) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(HighBP_proportion)
+```
+
+```{r}
+bmi_proportion <- train.df1 %>%
+  group_by(BMI) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(bmi_proportion)
+```
+
+```{r}
+HighChol_proportion <- train.df1 %>%
+  group_by(HighChol) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(HighChol_proportion)
+```
+
+```{r}
+DiffWalk_proportion <- train.df1 %>%
+  group_by(DiffWalk) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(DiffWalk_proportion)
+```
+
+```{r}
+PhysHlth_proportion <- train.df1 %>%
+  group_by(PhysHlth) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(PhysHlth_proportion)
+```
+
+```{r}
+HeartDiseaseorAttack_proportion <- train.df1 %>%
+  group_by(HighChol) %>%
+  summarise(diabetes_proportion = mean(Diabetes_binary == 1, na.rm = TRUE))
+
+print(HeartDiseaseorAttack_proportion)
+```
+
+```{r}
+# Mean Decrease Gini by order
+# "BMI" "HighBP" "HighChol" "DiffWalk" "PhysHlth" "HeartDiseaseorAttack" "CholCheck"
+```
+
+## **Random Forest vs Classification Tree Accuracy**
+
+```{r}
+#Getting predictions for Random Forest:
+rf_predictions1 <- predict(rf_final1, test.df1, type="class")
+rf_accuracy1 <- sum(rf_predictions1 == test.df1$Diabetes_binary) / nrow(test.df1)
+cat("Accuracy for Random Forest:", round(rf_accuracy1 * 100, 2), "%")
+
+#Getting predictions for Classification Tree:
+tree_predictions1 <- predict(tree_cv2, test.df1,type="class")
+tree_accuracy1 <- sum(tree_predictions1 == test.df1$Diabetes_binary) / nrow(test.df1)
+cat("\n Accuracy for Classification Tree:", round(tree_accuracy1 * 100, 2), "%")
+```
+
+## Loss Matrix
+
+```{r}
+# Getting PROB for Random Forest:
+rf_prob2 <- predict(rf_final1, test.df1,type="prob")
+
+# Cutoff is set
+new_threshold1 = 0.1  
+
+rf_predictions2 <- as.factor(ifelse(rf_prob2[,2] > new_threshold1, 1, 0))
+
+confusionMatrix(rf_predictions2,test.df1$Diabetes_binary, positive = "1")
+```
+
+## Logistic Regression Models
+
+```{r}
+summary(train.df1$Diabetes_binary)
+```
+
+```{r}
+# oversampling the minority class in the training set
+train.df1.oversampled1 <- ovun.sample(Diabetes_binary ~ ., data = train.df1, method = "over", N = 340000)$data
+
+# Check the new distribution
+cat("\n \n For the oversampling training dataset: \n")
+str(train.df1.oversampled1)
+summary(train.df1.oversampled1)
+```
+
+```{r}
+# undersampling the minority class in the training set
+train.df1.undersampled1 <- ovun.sample(Diabetes_binary ~ ., data = train.df1, method = "under", N = 58000)$data
+
+# Check the new distribution
+cat("\n \n For the unersampled training dataset: \n")
+str(train.df1.undersampled1)
+summary(train.df1.undersampled1)
+```
+
+```{r}
+cat("Orig:")
+table(train.df1$Diabetes_binary)
+cat("\n OverSampled:")
+table(train.df1.oversampled1$Diabetes_binary)
+cat("\n UnderSampled:")
+table(train.df1.undersampled1$Diabetes_binary)
+```
+
+```{r}
+#  Variables From Classification Tree
+# "HighBP" "BMI" "HighChol" "DiffWalk" "PhysHlth" "HeartDiseaseorAttack" "CholCheck"
+
+#  Variables From Random Forest
+# "HighBP" "BMI" "HighChol" "DiffWalk"  "PhysHlth" "HeartDiseaseorAttack"
+
+#  Add extra variables we are interested
+# "Stroke" "Smoker" 
+```
+
+```{r}
+cat("\n*Logistic Regression Model by using original dataset*\n")
+logreg0 <- glm(Diabetes_binary ~ HighBP + BMI + HighChol + DiffWalk + PhysHlth + HeartDiseaseorAttack + CholCheck + PhysActivity +  Stroke + Smoker,
+               data = df1, family="binomial")
+
+summary(logreg0)
+
+# Using training dataset
+# Logistic Regression Model by using training dataset
+# drop insignificant variable "Smoker"
+cat("\n*Logistic Regression Model by using training dataset*\n")
+logreg1 <- glm(Diabetes_binary ~ HighBP +  BMI + HighChol + DiffWalk + PhysHlth + HeartDiseaseorAttack + CholCheck+ PhysActivity + Stroke,                
+                data = train.df1, family = "binomial")
+summary(logreg1)
+
+
+# Using oversampling dataset
+# Logistic Regression Model by using oversampling dataset
+# drop insignificant variable "Smoker"
+cat("\n*Logistic Regression Model by using oversampling training dataset*\n")
+logreg1a <- glm(Diabetes_binary ~ HighBP +  BMI + HighChol + DiffWalk + PhysHlth + HeartDiseaseorAttack + CholCheck+ PhysActivity + Stroke,                
+                data = train.df1.oversampled1, family = "binomial")
+summary(logreg1a)
+
+
+
+# Using undersampling training dataset
+# Logistic Regression Model by using undersampling dataset
+# drop insignificant variable "Smoker" 
+cat("\n*Logistic Regression Model by using undersampling training dataset*\n")
+logreg1b <- glm(Diabetes_binary ~  HighBP +  BMI + HighChol + DiffWalk + PhysHlth + HeartDiseaseorAttack + CholCheck +PhysActivity + Stroke,                
+               data= train.df1.undersampled1, family="binomial")
+summary(logreg1b)
+```
+
+## Examine the coefficients β and exp(β)
+
+```{r}
+coef(logreg1)
+exp(coef(logreg1))
+
+coeftable1 <- data.frame(col1=coef(logreg1),col2=exp(coef(logreg1)))
+colnames(coeftable1)<-c('Coefficient1 (log-odds)','e^coefficient1 (odds)')
+coeftable1
+
+
+coef(logreg1a)
+exp(coef(logreg1a))
+
+coeftable1a <- data.frame(col1=coef(logreg1a),col2=exp(coef(logreg1a)))
+colnames(coeftable1a)<-c('Coefficient1a (log-odds)','e^coefficient1a (odds)')
+coeftable1a
+
+
+coef(logreg1b)
+exp(coef(logreg1b))
+
+coeftable1b <- data.frame(col1=coef(logreg1b),col2=exp(coef(logreg1b)))
+colnames(coeftable1b)<-c('Coefficient1b (log-odds)','e^coefficient1b (odds)')
+coeftable1b
+```
+
+```{r}
+# Making Predictions on the testing dataset
+#type="response" gives the probability, otherwise the output would be log odds.
+
+test.df1$PredProbs1 <- predict(logreg1, newdata = test.df1, type = "response")
+summary(test.df1$PredProbs1)
+
+
+
+test.df1$PredProbs1a <- predict(logreg1a, newdata = test.df1, type = "response")
+summary(test.df1$PredProbs1a)
+
+# Need to use undersampling training dataset?
+test.df1$PredProbs1b <- predict(logreg1b, newdata = test.df1, type = "response")
+summary(test.df1$PredProbs1b)
+
+
+summary(test.df1$Diabetes_binary)
+```
+
+## Receiver Operating Characteristic (ROC) Curve & Area Under the Curve (AUC)
+
+```{r}
+# We'll use the function "prediction" (note: NOT predict),
+# which transforms the predicted probabilities (first argument) 
+# and the actual 0/1 values (second argument)
+# into a standardized format of class prediction, and store them into
+# the object roc.pred...
+
+# Making Predictions on the Original data
+#roc.pred1 = prediction(df1$PredProbs1, df1$Diabetes_binary)
+#
+# ... which we can then use to actually create the ROC curve
+# with the function "performance" (note: we need to store this
+# so that we can then draw the curve):
+#perf = performance(roc.pred1, "tpr", "fpr")
+
+#If you don't get what it is doing: ?performance 
+#plot(perf,                      # the data
+#     main = "ROC Curve for Original set", # the chart's title
+#     xlab = "1 - Specificity",        # the name of the x-axis
+#     ylab = "Sensitivity",            # the name of the y-axis
+#     colorize=TRUE)                   # add color to curve depending on threshold prob.
+
+# ... and add the diagonal corresponding to the Random Assignment
+# benchmark model: 
+# adds line at intercept 0, with slope 1
+#abline(0,1) 
+
+
+#perf_auc1 = performance(roc.pred1, "auc")
+#auc_value1 <- as.numeric(perf_auc1@y.values)
+#cat("AUC for Original: ", auc_value1, "\n")
+
+
+# Generate ROC Curve for Test Set
+roc.pred1 <- prediction(test.df1$PredProbs1, test.df1$Diabetes_binary)
+
+
+# Calculate TPR (True Positive Rate) and FPR (False Positive Rate)
+perf1 <- performance(roc.pred1, "tpr", "fpr")
+
+# Plot the ROC Curve
+plot(perf1,                      # the data
+     main = "ROC Curve for Test Set",  # the chart's title
+     xlab = "1 - Specificity",        # the name of the x-axis
+     ylab = "Sensitivity",            # the name of the y-axis
+     colorize = TRUE)                 # add color to curve depending on threshold prob.
+
+# Add the diagonal line for Random Assignment
+abline(0, 1)
+
+# Calculate the Area Under the Curve (AUC)
+perf_auc1 <- performance(roc.pred1, "auc")
+auc_value1 <- as.numeric(perf_auc1@y.values)
+cat("AUC for Test Set: ", auc_value1, "\n")
+
+
+
+# Generate ROC Curve for Test Set
+roc.pred1a <- prediction(test.df1$PredProbs1a, test.df1$Diabetes_binary)
+
+# Calculate TPR (True Positive Rate) and FPR (False Positive Rate)
+perf1a <- performance(roc.pred1a, "tpr", "fpr")
+
+# Plot the ROC Curve
+plot(perf1a,                      # the data
+     main = "ROC Curve for oversampling set",  # the chart's title
+     xlab = "1 - Specificity",        # the name of the x-axis
+     ylab = "Sensitivity",            # the name of the y-axis
+     colorize = TRUE)                 # add color to curve depending on threshold prob.
+
+# Add the diagonal line for Random Assignment
+abline(0, 1)
+
+# Calculate the Area Under the Curve (AUC)
+perf_auc1a <- performance(roc.pred1a, "auc")
+auc_value1a <- as.numeric(perf_auc1a@y.values)
+cat("AUC for oversampling Set: ", auc_value1a, "\n")
+
+
+
+# Generate ROC Curve for Test Set
+roc.pred1b <- prediction(test.df1$PredProbs1b, test.df1$Diabetes_binary)
+
+# Calculate TPR (True Positive Rate) and FPR (False Positive Rate)
+perf1b <- performance(roc.pred1b, "tpr", "fpr")
+
+# Plot the ROC Curve
+plot(perf1b,                      # the data
+     main = "ROC Curve for undersampling set",  # the chart's title
+     xlab = "1 - Specificity",        # the name of the x-axis
+     ylab = "Sensitivity",            # the name of the y-axis
+     colorize = TRUE)                 # add color to curve depending on threshold prob.
+
+# Add the diagonal line for Random Assignment
+abline(0, 1)
+
+# Calculate the Area Under the Curve (AUC)
+perf_auc1b <- performance(roc.pred1b, "auc")
+auc_value1b <- as.numeric(perf_auc1b@y.values)
+cat("AUC for Undersampling Set: ", auc_value1b, "\n")
+```
+
+## Confusion Matrix
+
+```{r}
+# Converting Probabilities to Classifications (Original training)
+cat("\n*Converting Probabilities to Classifications (Original training)*\n")
+cutoff<-0.5
+test.df1$PredDiabetes_binary1 <- ifelse(test.df1$PredProbs1 >=cutoff,1,0)
+summary(test.df1$PredDiabetes_binary1)
+
+
+# Converting Probabilities to Classifications (Oversampling)
+cat("\n*Converting Probabilities to Classifications (Oversampling)*\n")
+cutoff <- 0.5
+test.df1$PredDiabetes_binary1a<- ifelse(test.df1$PredProbs1a >= cutoff, 1, 0)
+summary(test.df1$PredDiabetes_binary1a)
+
+# Converting Probabilities to Classifications (Undersampling)
+cat("\n*Converting Probabilities to Classifications (Undersampling)*\n")
+cutoff <- 0.5
+test.df1$PredDiabetes_binary1b<- ifelse(test.df1$PredProbs1b >= cutoff, 1, 0)
+summary(test.df1$PredDiabetes_binary1b)
+```
+
+```{r}
+# Training and testing
+cat("\n*Logistic regression confusion matrix by using training and testing dataset (cutoff set at 0.5)*\n")
+confusionMatrix(
+  data = as.factor(test.df1$PredDiabetes_binary1),
+  reference = as.factor(test.df1$Diabetes_binary),
+  positive = "1"
+)
+
+
+# Oversampling
+cat("\n*Logistic regression confusion matrix by using oversampling datasets (cutoff set at 0.5)*\n")
+confusionMatrix(
+  data = as.factor(test.df1$PredDiabetes_binary1a), 
+  reference = as.factor(test.df1$Diabetes_binary), 
+  positive = "1"
+)
+
+
+# Undersampling
+cat("\n*Logistic regression confusion matrix by using undersampling datasets (cutoff set at 0.5)*\n")
+confusionMatrix(
+  data = as.factor(test.df1$PredDiabetes_binary1b), 
+  reference = as.factor(test.df1$Diabetes_binary), 
+  positive = "1"
+)
+```
+
+## Comparing with Classification Tree & Random Forest
+
+```{r}
+#Logistic regression confusion matrix by using training and testing datasets (cutoff set at 0.5)
+cat("\n*Logistic regression confusion matrix by using training and testing dataset (cutoff set at 0.5)*\n")
+confusionMatrix(data = as.factor(test.df1$PredDiabetes_binary1),reference = as.factor(test.df1$Diabetes_binary),
+                positive = "1")
+
+#Logistic regression confusion matrix by using undersampling datasets (cutoff set at 0.5)
+cat("\n*Logistic regression confusion matrix by using undersampling datasets (cutoff set at 0.5)*\n")
+confusionMatrix(data = as.factor(test.df1$PredDiabetes_binary1a), reference = as.factor(test.df1$Diabetes_binary),
+                positive = "1")
+
+#Logistic regression confusion matrix by using undersampling datasets (cutoff set at 0.5)
+cat("\n*Logistic regression confusion matrix by using undersampling datasets (cutoff set at 0.5)*\n")
+confusionMatrix(data = as.factor(test.df1$PredDiabetes_binary1b), reference = as.factor(test.df1$Diabetes_binary),
+                positive = "1")
+
+
+#Random forest confusion matrix (threshold set at 0.1)
+cat("\n*Random forest confusion matrix (threshold set at 0.1)*\n")
+confusionMatrix(rf_predictions2,test.df1$Diabetes_binary,
+                positive = "1")
+
+
+#Random forest confusion matrix (threshold set at defualt)
+cat("\n*Random forest confusion matrix (threshold set at defualt)*\n")
+confusionMatrix(rf_predictions1,as.factor(test.df1$Diabetes_binary),
+                positive = "1")
+
+#Classification tree confusion matrix
+cat("\n*Classification tree confusion matrix*\n")
+confusionMatrix(tree_predictions1,as.factor(test.df1$Diabetes_binary),
+                positive = "1")
+```
+
+## **Clustering**
+
+```{r}
+str(data1)
+```
+
+```{r}
+data_0 <- subset(data1, Diabetes_binary == 0)
+data_1 <- subset(data1, Diabetes_binary == 1)
+
+print(data_0)
+print(data_1)
+```
+
+```{r}
+# Calculate all variables means
+means0 <- colMeans(data_0, na.rm = FALSE)
+
+means1 <- colMeans(data_1, na.rm = FALSE)
+```
+
+```{r}
+# Find out which variables change most
+means_tibble1 <- tibble(
+  Variable = names(data1),
+  DataMean0 = means0,
+  DataMean1 = means1
+)
+variable_types1 <- sapply(data_1, class)
+
+# Show changed in percentage
+means_tibble1 <- means_tibble1 %>%
+  mutate(DataType = variable_types1[Variable],PercentageChange = ((DataMean1 - DataMean0) / DataMean0) * 100) %>%
+  arrange(desc(PercentageChange))
+
+print(means_tibble1)
+```
+
+```{r}
+# "HeartDiseaseorAttack" "Stroke" "DiffWalk" "PhysHlth"  "HighBP"  "HighChol" "MentHlth" "GenHlth" "Age" "BMI"
+```
+
+```{r}
+df2 <- data0[, c("Diabetes_binary","PhysHlth", "MentHlth", "HeartDiseaseorAttack","Stroke", "DiffWalk", "HighBP", "HighChol","GenHlth","Age","BMI")]
+
+print(df2)
+summary(df2)
+```
+
+## Hierarchical Clustering
+
+To make Hierarchical clusters:
+
+-   dist to get the distance between rows
+
+-   hclust(distance,method=choose one; )
+
+-   cutree(clusters,k= select how many clusters you want in the end)
+
+```{r}
+# Random sampling from the original dataset
+set.seed(123)
+
+# Reduce sample size to 12,500 rows
+sample_indices2 <- sample(1:nrow(df2), size = 12500)  
+df_sample2 <- df2[sample_indices2, ]
+
+#　Calculate the distance matrix using Manhattan distance
+dist_diabetes2 <- dist(df_sample2[, 2:11], method = "manhattan")
+
+#Print the sampled dataset
+print(df_sample2)
+```
+
+## Cluster Comparison of Variable Means
+
+```{r}
+#Run the function hculst
+hc_diabetes2 <- hclust(dist_diabetes2, method = 'complete') 
+# Complete is MAX
+#Other options are: single, average, ward.D, ward.D2, centroid, mcquitty
+
+df_sample2$hcluster2 <- cutree(hc_diabetes2, k = 5)
+
+print(df_sample2)
+prop.table(table(df_sample2$Diabetes_binary))
+```
+
+```{r}
+# Statistic
+df_sample2 %>% group_by(hcluster2, Diabetes_binary) %>%
+  summarise_all(list(mean)) %>% arrange(hcluster2)
+
+# Grouping by hcluster2 and Diabetes_binary, calculating mean, and extracting percentage change
+df_pct_change2 <- df_sample2 %>%
+  group_by(hcluster2, Diabetes_binary) %>%
+  summarise(across(where(is.numeric), mean)) %>% 
+# Calculate means for numeric variables
+  arrange(hcluster2) %>%
+  group_by(hcluster2) %>% 
+  mutate(across(-Diabetes_binary, 
+# Exclude Diabetes_binary from percentage change
+                ~ ifelse(Diabetes_binary == 1, 
+                         100 * (. - lag(.)) / lag(.), 
+                         NA), 
+                .names = "{.col}_%_change")) %>%
+  filter(Diabetes_binary == 1) %>%
+# Keep only rows for Diabetes_binary = 1
+  select(hcluster2, ends_with("_%_change")) 
+# Select only hcluster1 and percentage change columns
+
+# Display the resulting dataframe
+df_pct_change2
+```
+
+```{r}
+df_pct_change2_grouped <- df_sample2 %>%
+  group_by(hcluster2, Diabetes_binary) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>% 
+  # Calculate means for numeric variables
+  arrange(hcluster2) %>%
+  group_by(hcluster2) %>% 
+  mutate(across(-Diabetes_binary, 
+                # Exclude Diabetes_binary from percentage change
+                ~ ifelse(Diabetes_binary == 1, 
+                         100 * (. - lag(.)) / lag(.), 
+                         NA),  # Explicitly set NA for other cases
+                .names = "{.col}_%_change")) %>%
+  filter(Diabetes_binary == 1 | is.na(Diabetes_binary)) %>%
+  # Keep rows for Diabetes_binary = 1 and also retain NA values
+  select(hcluster2, ends_with("_%_change")) %>%
+  # Select only hcluster2 and percentage change columns
+  pivot_longer(
+    cols = ends_with("_%_change"),  # Transform percentage change columns
+    names_to = "Variable",          # New column for variable names
+    values_to = "Percentage_Change",# New column for percentage change values
+    values_drop_na = FALSE          # Ensure NA values are not dropped
+  ) %>%
+  arrange(hcluster2, desc(Percentage_Change)) # Order by cluster and percentage change descending
+
+# Display the grouped and sorted dataframe with NA values
+print(df_pct_change2_grouped)
+```
+
+```{r}
+# Summarize the data for df_sample2
+df_growth2 <- df_sample2 %>%
+  group_by(hcluster2, Diabetes_binary) %>%
+  summarise(
+    PhysHlth = mean(PhysHlth, na.rm = TRUE),
+    MentHlth = mean(MentHlth, na.rm = TRUE),
+    HeartDiseaseorAttack = mean(HeartDiseaseorAttack, na.rm = TRUE),
+    Stroke = mean(Stroke, na.rm = TRUE),
+    DiffWalk = mean(DiffWalk, na.rm = TRUE),
+    HighBP = mean(HighBP, na.rm = TRUE),
+    HighChol = mean(HighChol, na.rm = TRUE),
+    GenHlth = mean(GenHlth, na.rm = TRUE),
+    Age = mean(Age, na.rm = TRUE),
+    BMI = mean(BMI, na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = -c(hcluster2, Diabetes_binary), names_to = "Variable", values_to = "Mean") %>%
+  pivot_wider(names_from = Diabetes_binary, values_from = Mean, names_prefix = "Diabetes_binary_") %>%
+  mutate(
+    GrowthRate = (Diabetes_binary_1 - Diabetes_binary_0) / Diabetes_binary_0 * 100
+  )
+
+
+variable_order <- c("PhysHlth", "MentHlth", "HeartDiseaseorAttack", "Stroke", 
+                    "DiffWalk", "HighBP", "HighChol", "GenHlth", "Age", "BMI")
+
+
+
+# Plot the growth rate for df_sample2
+ggplot(df_growth2, aes(x = factor(Variable, levels = variable_order), y = GrowthRate, fill = as.factor(hcluster2))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Growth Rate of Variables Across Clusters (original dataset)",
+    x = "Variables",
+    y = "Growth Rate (%)",
+    fill = "Cluster"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+dend_diabetes2 <- as.dendrogram(hc_diabetes2)
+dend_colored1 <- color_branches(dend_diabetes2, k = 5)
+par(mfrow = c(1, 1))
+plot(dend_colored1, main="Dendogram", xlab="Data Points")
+```
+
+```{r}
+# Customize dendrogram with colors
+dend_colored <- as.dendrogram(hc_diabetes2) %>% 
+  color_branches(k = 5) %>%        # Color branches for 5 clusters
+  color_labels(k = 5)             # Color labels for 5 clusters
+
+# Create circular dendrogram
+circlize_dendrogram(dend_colored,
+                    labels_track_height = NA,   # Hide labels (optional)
+                    dend_track_height = 0.5)   # Set dendrogram height
+```
