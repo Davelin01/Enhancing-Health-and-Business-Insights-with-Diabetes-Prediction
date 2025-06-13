@@ -1,6 +1,5 @@
 # Diabetes Health Indicators Analysis
 📋 Overview
-[View rendered HTML result](https://github.com/Davelin01/Diabetes_Factors_Analysis_R/blob/main/Final%20Project.html)
 Diabetes is one of the most prevalent chronic diseases worldwide and poses a significant economic burden. With cases on the rise, combating diabetes requires prevention, effective management, and targeted support. This analysis presents actionable strategies for health insurance companies to create specialized plans tailored to high-risk individuals.
 
 These targeted products help mitigate diabetes risks through preventive care while also supporting sustainable business growth. This dual-focused approach improves individual health outcomes and enhances insurer profitability.
