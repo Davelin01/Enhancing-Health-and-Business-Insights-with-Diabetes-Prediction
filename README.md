@@ -1,128 +1,157 @@
-# Diabetes Health Indicators Analysis
-📋 Overview
-Diabetes is one of the most prevalent chronic diseases worldwide and poses a significant economic burden. With cases on the rise, combating diabetes requires prevention, effective management, and targeted support. This analysis presents actionable strategies for health insurance companies to create specialized plans tailored to high-risk individuals.
+# 🚀 Enhancing Health and Business Insights with Diabetes Prediction
 
-These targeted products help mitigate diabetes risks through preventive care while also supporting sustainable business growth. This dual-focused approach improves individual health outcomes and enhances insurer profitability.
+## 📊 Overview
 
-📊 About the Dataset
+This project applies data mining and machine learning to understand key diabetes risk factors using the CDC's BRFSS2015 dataset. Our aim is twofold:  
+- **Advance public health insights** by identifying high-impact predictors of diabetes.  
+- **Guide health insurers** in designing specialized, data-driven plans for high-risk individuals, supporting prevention and improved management while optimizing business growth.
 
-We used the Diabetes Health Indicators Dataset from Kaggle, which contains 253,680 survey responses from the CDC’s Behavioral Risk Factor Surveillance System (BRFSS 2015). This annual telephone survey collects health-related data such as:
+---
 
-Risk behaviors
+## 🗂️ Dataset
 
-Chronic health conditions
+- **Source**: [Kaggle - Diabetes Health Indicators Dataset](https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset/data)
+- **Description**: 253,680 survey responses from the CDC's 2015 Behavioral Risk Factor Surveillance System (BRFSS), covering health behaviors, chronic conditions, and preventive services.
+- **Variables**: Features include binary, categorical, and continuous health and lifestyle indicators (see "Data Description" below).
 
-Use of preventive services
+---
 
-🔍 Exploratory Data Analysis & Modeling
+## 📋 Data Description
 
-⚠️ Imbalanced Data
+| Variable                | Type        | Description                                                                                  |
+|-------------------------|-------------|----------------------------------------------------------------------------------------------|
+| Diabetes_binary         | Binary      | 0 = no diabetes, 1 = (pre)diabetes                                                          |
+| HighBP                  | Binary      | 0 = no high BP, 1 = high BP                                                                  |
+| HighChol                | Binary      | 0 = no high cholesterol, 1 = high cholesterol                                                |
+| CholCheck               | Binary      | 0 = no cholesterol check in 5 years, 1 = yes                                                 |
+| BMI                     | Continuous  | Body Mass Index                                                                              |
+| Smoker                  | Binary      | 0 = never smoked 100 cigarettes, 1 = yes                                                     |
+| Stroke                  | Binary      | 0 = never had a stroke, 1 = yes                                                              |
+| HeartDiseaseorAttack    | Binary      | 0 = no CHD/MI, 1 = CHD/MI                                                                    |
+| PhysActivity            | Binary      | 0 = no physical activity (past 30 days), 1 = yes                                             |
+| Fruits                  | Binary      | 0 = no fruit daily, 1 = yes                                                                  |
+| Veggies                 | Binary      | 0 = no veggies daily, 1 = yes                                                                |
+| HvyAlcoholConsump       | Binary      | 0 = not heavy drinker, 1 = heavy drinker                                                     |
+| AnyHealthcare           | Binary      | 0 = no coverage, 1 = has health coverage                                                     |
+| NoDocbcCost             | Binary      | 0 = did not skip doctor due to cost, 1 = did                                                 |
+| MentHlth                | Continuous  | Days poor mental health (0-30)                                                               |
+| PhysHlth                | Continuous  | Days poor physical health (0-30)                                                             |
+| DiffWalk                | Binary      | 0 = no walking difficulty, 1 = yes                                                           |
+| Sex                     | Binary      | 0 = female, 1 = male                                                                         |
+| Education               | Categorical | 0 = <HS grad, 1 = HS grad, 2 = some college, 3 = college grad                                |
 
-The target variable Diabetes_binary has 22,000 (0s) and 35,000 (1s)
+---
 
-We created 3 versions of the training dataset:
+## 🛠️ Analytical Approach
 
-Original (1)
+### 1️⃣ Data Preprocessing
 
-Oversampled (1a)
+- **Class Imbalance**: Created three training sets: original, oversampled, and undersampled to address the imbalance in diabetes status.
+  ```r
+  # Visualize the class imbalance before and after sampling
+  barplot(table(train.df1$Diabetes_binary), main = "Original Class Distribution")
+  barplot(table(train.df1.oversampled1$Diabetes_binary), main = "Oversampled Class Distribution")
+  barplot(table(train.df1.undersampled1$Diabetes_binary), main = "Undersampled Class Distribution")
+  ```
 
-Undersampled (1b)
+- **Feature Engineering**: Collapsed and recoded education levels, removed problematic or insufficiently described variables.
+  ```r
+  # Example for recoding Education variable
+  data$Education[data$Education %in% c(1, 2, 3)] <- 0
+  data$Education[data$Education == 4] <- 1
+  data$Education[data$Education == 5] <- 2
+  data$Education[data$Education == 6] <- 3
+  ```
 
-🧹 Data Cleaning
+---
 
-Merged categories 1, 2, 3 in the Education column into one.
+### 3️⃣ Predictive Modeling
 
-Removed Age, Income (due to missing descriptions).
+#### Classification Tree Example
 
-Removed GenHlth (inconsistent behavior in previous assignments).
+```r
+library(rpart)
+library(rpart.plot)
+tree_cv2 <- rpart(Diabetes_binary ~ ., data = train.df1, 
+                  method = "class", minbucket = 30, cp = 0.0022)
+rpart.plot(tree_cv2, digits = -2)
+```
 
-🌳 Modeling Approaches
+#### Random Forest Variable Importance
 
-1. Classification Tree
-Performed cross-validation.
+```r
+library(randomForest)
+set.seed(123, sample.kind = "Rejection")
+rf_final1 <- randomForest(Diabetes_binary ~ ., data = train.df1, 
+                          ntree = 20, nodesize = 50, mtry = 3)
+varImpPlot(rf_final1)
+```
 
-Best complexity parameter (cp) = 0.0022.
+#### Logistic Regression
 
-Top 7 variables:
-HighBP, BMI, HighChol, DiffWalk, PhysHlth, HeartDiseaseorAttack.
+```r
+# Logistic Regression Model by using training dataset
+logreg1 <- glm(Diabetes_binary ~ HighBP + BMI + HighChol + DiffWalk + PhysHlth +
+               HeartDiseaseorAttack + PhysActivity + Stroke,
+               data = train.df1, family = "binomial")
+summary(logreg1)
+exp(coef(logreg1)) # Odds ratios
 
-2. Random Forest
-Best ntree = 20; best mtry = 3 (based on Out-of-Bag error).
+# Logistic Regression Model by using oversampled training dataset
+logreg1a <- glm(Diabetes_binary ~ HighBP + BMI + HighChol + DiffWalk + PhysHlth +
+                HeartDiseaseorAttack + PhysActivity + Stroke,
+                data = train.df1.oversampled1, family = "binomial")
+summary(logreg1a)
+exp(coef(logreg1a)) # Odds ratios
 
-Variable importance (Mean Decrease in Gini) confirmed same top predictors.
+# Logistic Regression Model by using undersampled training dataset
+logreg1b <- glm(Diabetes_binary ~ HighBP + BMI + HighChol + DiffWalk + PhysHlth +
+                HeartDiseaseorAttack + PhysActivity + Stroke,
+                data = train.df1.undersampled1, family = "binomial")
+summary(logreg1b)
+exp(coef(logreg1b)) # Odds ratios
+```
 
-3. Logistic Regression
-Added CholCheck, Stroke, and Smoker.
+---
 
-Smoker was removed due to high p-value (not statistically significant).
+### 📉 ROC Curve
 
-Consistent performance across all dataset variations:
+![ROC Curve](https://github.com/user-attachments/assets/5e429e10-e709-4228-99cd-ea9e66bed3d2)
+*ROC curve for the logistic regression model by different sampled way dataset, AUC ~0.79.*
 
-AUC (Original): 0.7908
+---
 
-AUC (Oversampled): 0.7918
+### 🧮 Confusion Matrix 
 
-AUC (Undersampled): 0.7916
+**Original**, **Oversampled**, **Undersampled**
 
-4. Hierarchical Clustering
-Identified 5 clusters.
+![Confusion Matrix](https://github.com/user-attachments/assets/55719cf4-370d-426f-8b31-e338e81722e4)
 
-Top 3 varying features:
-Stroke, HighBP, HeartDiseaseorAttack.
+---
 
-🔢 Logistic Regression Results
+### ⚖️ Odds Ratios (Logistic Regression)
 
+![image](https://github.com/user-attachments/assets/849db828-6b84-4cd8-bd63-3d962f3ca3ef)
 
-📈 Model Performance (Cutoff = 0.5)
-✅ Original Dataset
-Accuracy: 0.8635
+---
 
-Sensitivity: 0.1131
+### 🔗 Hierarchical Clustering
 
-Specificity: 0.9849
+![Hierarchical Clustering](https://github.com/user-attachments/assets/198a14d6-a6b1-4e73-8add-fd5eb7af7d17)
 
-Precision: 0.5484
+Top 3 factors that show the highest changes are stroke, high blood pressure, and heart disease.
 
-Note: High specificity, but very poor sensitivity due to class imbalance.
+---
 
-🔁 Oversampled Dataset
-Accuracy: 0.7238
+## 🏆 Key Results
 
-Sensitivity: 0.7065
+- **Top predictors**: HighBP, BMI, HighChol, DiffWalk, PhysHlth, HeartDiseaseorAttack, Stroke, PhysActivity.
+- **Odds Ratios**: HighBP increases odds by 2.85x； physical activity reduces odds by ~0.82x.
+- **Model Insights**:
+  - Original data: High specificity, low sensitivity (misses positives).
+  - Oversampled/Undersampled: Balanced sensitivity/specificity, lower overall accuracy.
+- **Recommendations**:
+  - Individuals with elevated blood pressure, cholesterol, BMI, heart disease, or stroke history should monitor these closely.
+  - Insurers should target high-risk groups to improve care and business outcomes.
 
-Specificity: 0.7266
-
-Precision: 0.2949
-
-Note: Improved detection of positive cases (diabetes), but precision drops.
-
-🔁 Undersampled Dataset
-Accuracy: 0.7198
-
-Sensitivity: 0.7126
-
-Specificity: 0.7209
-
-Precision: 0.2924
-
-Note: Very similar to oversampled. Balanced sensitivity/specificity trade-off.
-
-📌 Key Takeaways
-Top risk factors: HighBP, HighChol, BMI, HeartDiseaseorAttack, DiffWalk, Stroke.
-
-Individuals with these conditions should monitor them regularly and adopt lifestyle changes or treatment.
-
-CholCheck likely reflects increased diagnosis awareness—not necessarily causal.
-
-PhysActivity is protective—encouraging regular exercise is key.
-
-💡 Recommendation for Insurance Companies
-Insurance providers should design specialized products targeting high-risk individuals—those with multiple predictive traits:
-
-Higher premiums with tailored preventive care
-
-Incentives for maintaining healthy behaviors (e.g., gym reimbursements)
-
-Better risk prediction → sustainable financial outcomes
-
-By offering targeted support, insurers can reduce long-term costs while delivering better outcomes.
+---
