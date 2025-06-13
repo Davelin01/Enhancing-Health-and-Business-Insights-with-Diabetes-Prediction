@@ -47,27 +47,28 @@ This project applies data mining and machine learning to understand key diabetes
 ### 1️⃣ Data Preprocessing
 
 - **Class Imbalance**: Created three training sets: original, oversampled, and undersampled to address the imbalance in diabetes status.
+- ![image](https://github.com/user-attachments/assets/c66f6d84-19de-4326-a545-5c2c86518a8f)
+  ```r
+  # Oversampling the minority class in the training set
+  train.df1.oversampled1 <- ovun.sample(Diabetes_binary ~ ., data = train.df1, method = "over", N = 340000)$data
+
+  # Undersampling the majority class in the training set
+  train.df1.undersampled1 <- ovun.sample(Diabetes_binary ~ ., data = train.df1, method = "under", N = 58000)$data
+  ```
+  
   ```r
   # Visualize the class imbalance before and after sampling
   barplot(table(train.df1$Diabetes_binary), main = "Original Class Distribution")
   barplot(table(train.df1.oversampled1$Diabetes_binary), main = "Oversampled Class Distribution")
   barplot(table(train.df1.undersampled1$Diabetes_binary), main = "Undersampled Class Distribution")
   ```
-
-- **Feature Engineering**: Collapsed and recoded education levels, removed problematic or insufficiently described variables.
-  ```r
-  # Example for recoding Education variable
-  data$Education[data$Education %in% c(1, 2, 3)] <- 0
-  data$Education[data$Education == 4] <- 1
-  data$Education[data$Education == 5] <- 2
-  data$Education[data$Education == 6] <- 3
-  ```
+![image](https://github.com/user-attachments/assets/c2b1cd58-2321-4a43-890a-83bb4b1a7bf3)
 
 ---
 
 ### 3️⃣ Predictive Modeling
 
-#### Classification Tree Example
+#### Classification Tree
 
 ```r
 library(rpart)
@@ -77,7 +78,7 @@ tree_cv2 <- rpart(Diabetes_binary ~ ., data = train.df1,
 rpart.plot(tree_cv2, digits = -2)
 ```
 
-#### Random Forest Variable Importance
+#### Random Forest Variable
 
 ```r
 library(randomForest)
